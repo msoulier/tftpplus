@@ -3,7 +3,7 @@ require 'rake/rdoctask'
 require 'rake/clean'
 require 'rake/gempackagetask'
 
-Version = '0.1'
+Version = '0.3'
 
 task "default" => ["test"]
 
@@ -20,6 +20,10 @@ Rake::RDocTask.new('rdoc') do |t|
     t.rdoc_files.include('README', 'lib/**/*.rb')
     t.main = 'README'
     t.title = 'Tftpplus API documentation'
+end
+
+task 'tar' do
+    system "tar -C .. --exclude '.svn' -zcvf tftpplus-#{Version}.tar.gz tftpplus/{test,doc,lib,bin,ChangeLog,Rakefile,README}"
 end
 
 task 'pushsite' do

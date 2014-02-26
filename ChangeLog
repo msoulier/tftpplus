@@ -1,43 +1,163 @@
-2006-10-10 msoulier
-	* Added site, and Rakefile entry to push site.
+2007-03-15 00:00  msoulier
+
+	* ChangeLog: Updated ChangeLog
+
+2007-03-14 01:32  msoulier
+
+	* lib/net/tftp+.rb, test/test.rb: Added testcases.
+
+2007-03-13 16:27  msoulier
+
+	* test/test.rb: Updated some testcases.
+
+2007-03-10 23:42  msoulier
+
+	* bin/tftp_server.rb, lib/net/tftp+.rb: First working downloads
+	  from server. Woohoo!
+
+2007-03-09 05:04  msoulier
+
+	* lib/net/tftp+.rb: Fixed lots of silly little runtime errors in
+	  testing.
+	  Still not transferring properly, but we're much closer.
+
+2007-03-07 03:22  msoulier
+
+	* lib/net/tftp+.rb: Filled-out the timeout implementation. Server
+	  still fails to start a download
+	  at this point.
+
+2007-03-06 10:16  msoulier
+
+	* lib/net/tftp+.rb: Added check of file path in download request.
+
+2006-12-22 23:43  msoulier
+
+	* lib/net/tftp+.rb: Redefined TftpErrorType
+
+2006-12-22 04:41  msoulier
+
+	* bin/tftp_server.rb, lib/net/tftp+.rb: Starting sample server
+	  implementation.
+
+2006-12-22 04:27  msoulier
+
+	* bin/tftp_client.rb, lib/net/tftp+.rb: First pass at adding server
+	  implementation.
+
+2006-12-21 05:39  msoulier
+
+	* Rakefile, lib/net/tftp+.rb: Added a little more server. Cleaned
+	  up client.
+
+2006-12-19 04:35  msoulier
+
+	* lib/net/tftp+.rb: Fleshing out some of the server and handler
+	  code.
+
+2006-12-19 01:07  msoulier
+
+	* bin/tftp_client.rb, lib/net/tftp+.rb: Cleaned up the client a
+	  bit.
+
+2006-12-09 03:38  msoulier
+
+	* ChangeLog: Updated ChangeLog
+
+2006-12-09 03:34  msoulier
+
+	* Rakefile, doc, doc/rfc1350.txt, doc/rfc2347.txt, doc/rfc2348.txt:
+	  Added tar task to rakefile
+
+2006-12-09 03:23  msoulier
+
+	* ChangeLog, README: Updated ChangeLog and README
+
+2006-12-09 03:18  msoulier
+
+	* Rakefile: Updated version
+
+2006-12-09 03:17  msoulier
+
+	* lib/net/tftp+.rb: Fixing remote TID RFC compliance.
+
+2006-12-08 23:41  msoulier
+
+	* lib/net/tftp+.rb: Updated log messages
+
+2006-10-17 02:33  msoulier
+
+	* lib/net/tftp+.rb: Fix calls to tftpassert.
+
+2006-10-16 00:48  msoulier
+
+	* lib/net/tftp+.rb: Added some rdoc
+
+2006-10-15 23:58  msoulier
+
+	* bin/tftp_client.rb, lib/net/tftp+.rb: Moved the logger to the
+	  client, and put in a nil logger in the library.
+
+2006-10-15 20:53  msoulier
+
+	* lib/net/tftp+.rb, test/test.rb: Added a stdlib logger
+
+2006-10-10 02:52  msoulier
+
+	* ChangeLog, Rakefile, site, site/index.html: Added site directory
+	  with Rakefile entry to push it public
+
+2006-10-10 02:10  msoulier
+
+	* Rakefile: Refactored Rakefile
+
+2006-10-10 02:08  msoulier
+
+	* ChangeLog, README, Rakefile: Added Rakefile for project
+	  management.
 
 2006-10-10 01:46  msoulier
 
-	* trunk/ChangeLog, trunk/README, trunk/doc,
-	  trunk/lib/net/tftp+.rb: Adding Rakefile
+	* ChangeLog, README, doc, lib/net/tftp+.rb: Adding Rakefile
 
 2006-10-06 01:35  msoulier
 
-	* trunk/lib/net/tftp+.rb: Optimizing Tftp object dispatch
+	* lib/net/tftp+.rb: Optimizing Tftp object dispatch
 
 2006-10-04 01:27  msoulier
 
-	* trunk/lib/net/tftp+.rb: minor method rename
+	* lib/net/tftp+.rb: minor method rename
 
 2006-09-25 02:11  msoulier
 
-	* trunk/lib/net/tftp+.rb: Added timeouts on recvfrom
+	* lib/net/tftp+.rb: Added timeouts on recvfrom
 
 2006-09-24 02:39  msoulier
 
-	* trunk/lib/net/tftp+.rb: Updated debugging output
+	* lib/net/tftp+.rb: Updated debugging output
+
+2006-09-24 02:34  msoulier
+
+	* bin/tftp_client.rb: Making client executable
+
+2006-09-24 02:32  msoulier
+
+	* bin, share: Renaming share to bin
 
 2006-09-24 02:31  msoulier
 
-	* trunk/lib/net/tftp+.rb, trunk/share, trunk/share/tftp_client.rb,
-	  trunk/test/test.rb: Moved client code into its own sample client.
+	* lib/net/tftp+.rb, share, share/tftp_client.rb, test/test.rb:
+	  Moved client code into its own sample client.
 
 2006-09-22 16:48  msoulier
 
-	* trunk/lib/net/tftp+.rb: Pulling hardcoded test
+	* lib/net/tftp+.rb: Pulling hardcoded test
 
 2006-09-22 16:44  msoulier
 
-	* doc, lib, test, trunk/doc, trunk/lib, trunk/test: Setting up
-	  branch structure.
+	* doc, lib, test, doc, lib, test: Setting up branch structure.
 
-2006-09-22 16:42  msoulier
+2006-09-22 16:44  msoulier
 
-	* doc, doc/rfc1350.txt, doc/rfc2347.txt, doc/rfc2348.txt, lib,
-	  lib/net, lib/net/tftp+.rb, test, test/test.rb: Initial import.
+	* branches, tags, .: Setting up branch structure.
 

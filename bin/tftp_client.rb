@@ -47,9 +47,9 @@ EOF
                 $log.level = Logger::DEBUG
                 $log.debug('client') { "Debug output requested" }
             end
-            opts.on('-b', '--blksize=', 'Blocksize option: 8-65536 bytes') do |b|
+            opts.on('-b', '--blocksize=', 'Blocksize option: 8-65536 bytes') do |b|
                 options.blksize = b.to_i
-                $log.debug('client') { "blksize is #{b}" }
+                $log.debug('client') { "blocksize is #{b}" }
             end
             opts.on_tail('-h', '--help', 'Show this message') do
                 puts opts
@@ -67,7 +67,7 @@ EOF
         #end
         unless options.blksize >= 8 and options.blksize <= 65536
             raise OptionParser::InvalidOption,
-                "blksize can only be between 8 and 65536 bytes"
+                "blocksize can only be between 8 and 65536 bytes"
         end
         unless options.port > 0 and options.port < 65537
             raise OptionParser::InvalidOption,
@@ -75,7 +75,6 @@ EOF
         end
     rescue Exception => details
         $stderr.puts details.to_s
-        $stderr.puts opts
         exit 1
     end
 
@@ -88,13 +87,25 @@ def main
     size = 0
     start = Time.now
     $log.info('client') { "Starting download of #{options.filename} from #{options.host}" }
-    $log.info('client') { "Options: blksize = #{options.blksize}" }
+    $log.info('client') { "Options: blocksize = #{options.blksize}" }
 
-    client = TftpClient.new(options.host, options.port)
+    begin
+        client = TftpClient.new(options.host, options.port)
+    rescue SocketError => details
+        $stderr.puts "Error looking up host #{options.host}"
+        exit 1
+    end
+    
     tftp_opts = { :blksize => options.blksize.to_i }
-    client.download(options.filename, options.filename, tftp_opts) do |pkt|
-        size += pkt.data.length
-        $log.debug('client') { "Downloaded #{size} bytes" }
+    
+    begin
+        client.download(options.filename, options.filename, tftp_opts) do |pkt|
+            size += pkt.data.length
+            $log.debug('client') { "Downloaded #{size} bytes" }
+        end
+    rescue TftpError => details
+        $stderr.puts "Fatal exception in transfer"
+        $stderr.puts details
     end
 
     finish = Time.now
