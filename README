@@ -1,0 +1,16 @@
+About Tftpplus:
+===============
+
+A new tftp library for clients and servers that supports RFCs 1350, 2347 and
+2348 (ie. variable block sizes).
+
+Release Notes:
+==============
+
+About version 0.1:
+==================
+
+- Added timeouts on recvfrom
+- Updated debugging output
+- Moved client code into its own sample client.
+- Client functioning with support for variable block sizes.

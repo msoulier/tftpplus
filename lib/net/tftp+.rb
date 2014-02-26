@@ -1,11 +1,14 @@
 # A Ruby library for Trivial File Transfer Protocol.
 # Supports the following RFCs
 # RFC 1350 - THE TFTP PROTOCOL (REVISION 2)
-# RFC 2347 - TFTP Option Extension # FIXME - not yet
-# RFC 2348 - TFTP Blocksize Option # FIXME - not yet
+# RFC 2347 - TFTP Option Extension
+# RFC 2348 - TFTP Blocksize Option
+# Currently, the TftpServer class is not functional.
+# The TftpClient class works fine. Let me know if this is not true.
 
 require 'socket'
 require 'timeout'
+require 'resolv'
 
 # Todo
 # - properly handle decoding of options ala rfc 2347
@@ -21,33 +24,81 @@ MaxDups         = 20
 Assertions      = true
 MaxRetry        = 5
 
-def assert(&code)
-    if not code.call and Assertions
-        raise RuntimeError, "Assertion Failed", caller
+# This class is a Nil logging device. It catches all of the logger calls and
+# does nothing with them. It is up to the client to provide a real logger
+# and assign it to $tftplog.
+class TftpNilLogger
+    def method_missing(*args)
+        # do nothing
     end
 end
 
-class TftpError < IOError
+# This global is the logger used by the library. By default it is an instance
+# of TftpNilLogger, which does nothing. Replace it with a logger if you want
+# one.
+$tftplog = TftpNilLogger.new
+
+class TftpError < RuntimeError
 end
 
+# This function is a custom assertion in the library to catch unsupported
+# states and types. If the assertion fails, msg is raised in a TftpError
+# exception.
+def tftpassert(msg, &code)
+    if not code.call and Assertions
+        raise TftpError, "Assertion Failed: #{msg}", caller
+    end
+end
+
+# This class is the root of all TftpPacket classes in the library. It should
+# not be instantiated directly. It exists to provide code sharing to the child
+# classes.
 class TftpPacket
     attr_accessor :opcode, :buffer
+
+    # Class constructor. This class and its children take no parameters. A
+    # client is expected to set instance variables after instantiation.
     def initialize
         @opcode = 0
         @buffer = nil
+        @options = {}
     end
 
+    # Abstract method, must be implemented in all child classes.
     def encode
         raise NotImplementedError
     end
 
+    # Abstract method, must be implemented in all child classes.
     def decode
         raise NotImplementedError
     end
 
+    # This is a setter for the options hash. It ensures that the keys are
+    # Symbols and that the values are strings. You can pass in a non-String
+    # value as long as the .to_s method returns a good value.
+    def options=(opts)
+        myopts = {}
+        opts.each do |key, val|
+            $tftplog.debug('tftp+') { "looping on key #{key}, val #{val}" }
+            $tftplog.debug('tftp+') { "class of key is #{key.class}" }
+            tftpassert("options keys must be symbols") { key.class == Symbol }
+            myopts[key.to_s] = val.to_s
+        end
+        @options = myopts
+    end
+
+    # A getter for the options hash.
+    def options
+        return @options
+    end
+
     protected
 
-    def decode_with_options(buffer)
+    # This method takes the portion of the buffer containing the options and
+    # decodes it, returning a hash of the option name/value pairs, with the
+    # keys as Symbols and the values as Strings.
+    def decode_options(buffer)
         # We need to variably decode the buffer. The buffer here is only that
         # part of the original buffer containing options. We will decode the
         # options here and return an options array.
@@ -69,28 +120,32 @@ class TftpPacket
             name  = struct.shift
             value = struct.shift
             options[name.to_sym] = value
-            puts "decoded option #{name} with value #{value}"
+            $tftplog.debug('tftp+') { "decoded option #{name} with value #{value}" }
         end
         return options
     end
 end
 
+# This class is a parent class for the RRQ and WRQ packets, as they share a
+# lot of code.
+#         2 bytes    string   1 byte     string   1 byte
+#         -----------------------------------------------
+#  RRQ/  | 01/02 |  Filename  |   0  |    Mode    |   0  |
+#  WRQ    -----------------------------------------------
+#      +-------+---~~---+---+---~~---+---+---~~---+---+---~~---+---+
+#      |  opc  |filename| 0 |  mode  | 0 | blksize| 0 | #octets| 0 |
+#      +-------+---~~---+---+---~~---+---+---~~---+---+---~~---+---+
 class TftpPacketInitial < TftpPacket
-    attr_accessor :filename, :mode, :options
-    #         2 bytes    string   1 byte     string   1 byte
-    #         -----------------------------------------------
-    # RRQ/  | 01/02 |  Filename  |   0  |    Mode    |   0  |
-    # WRQ    -----------------------------------------------
-    #      +-------+---~~---+---+---~~---+---+---~~---+---+---~~---+---+
-    #      |  opc  |filename| 0 |  mode  | 0 | blksize| 0 | #octets| 0 |
-    #      +-------+---~~---+---+---~~---+---+---~~---+---+---~~---+---+
+    attr_accessor :filename, :mode
+
     def initialize
         super()
         @filename = nil
         @mode = nil
-        @options = {}
     end
 
+    # Encode of the packet based on the instance variables. Both the filename
+    # and mode instance variables must be set or an exception will be thrown.
     def encode
         unless @opcode and @filename and @mode
             raise ArgumentError, "Required arguments missing."
@@ -114,8 +169,6 @@ class TftpPacketInitial < TftpPacket
         format += "x"
 
         @options.each do |key, value|
-            key = key.to_s
-            value = value.to_s
             format += "a#{key.length}x"
             format += "a#{value.length}x"
             datalist.push key
@@ -126,6 +179,8 @@ class TftpPacketInitial < TftpPacket
         return self
     end
 
+    # Decode the packet based on the contents of the buffer instance variable.
+    # It populates the filename and mode instance variables.
     def decode
         unless @buffer
             raise ArgumentError, "Can't decode, buffer is empty."
@@ -158,7 +213,7 @@ class TftpPacketInitial < TftpPacket
             raise TftpError, "Failed to parse nulls looking for options"
         elsif nulls.length > 3
             lower_bound = nulls[2] + 1
-            @options = decode_with_options(@buffer[lower_bound..-1])
+            @options = decode_options(@buffer[lower_bound..-1])
         end
 
         return self
@@ -166,6 +221,8 @@ class TftpPacketInitial < TftpPacket
 
     protected
 
+    # This method is a boolean validator that returns true if the blocksize
+    # passed is valid, and false otherwise.
     def valid_blocksize?(blksize)
         blksize = blksize.to_i
         if blksize >= 8 and blksize <= 65464
@@ -175,6 +232,9 @@ class TftpPacketInitial < TftpPacket
         end
     end
 
+    # This method is a boolean validator that returns true of the mode passed
+    # is valid, and false otherwise. The modes of 'netascii', 'octet' and
+    # 'mail' are valid, even though only 'octet' is currently implemented.
     def valid_mode?(mode)
         case mode
         when "netascii", "octet", "mail"
@@ -185,6 +245,7 @@ class TftpPacketInitial < TftpPacket
     end
 end
 
+# The RRQ packet to request a download.
 class TftpPacketRRQ < TftpPacketInitial
     def initialize
         super()
@@ -192,6 +253,7 @@ class TftpPacketRRQ < TftpPacketInitial
     end
 end
 
+# The WRQ packet to request an upload.
 class TftpPacketWRQ < TftpPacketInitial
     def initialize
         super()
@@ -199,12 +261,13 @@ class TftpPacketWRQ < TftpPacketInitial
     end
 end
 
+#          2 bytes    2 bytes       n bytes
+#          ---------------------------------
+#   DATA  | 03    |   Block #  |    Data    |
+#          ---------------------------------
 class TftpPacketDAT < TftpPacket
     attr_accessor :data, :buffer, :blocknumber
-    #        2 bytes    2 bytes       n bytes
-    #        ---------------------------------
-    # DATA  | 03    |   Block #  |    Data    |
-    #        ---------------------------------
+
     def initialize
         super()
         @opcode = 3
@@ -238,12 +301,13 @@ class TftpPacketDAT < TftpPacket
     end
 end
 
+#         2 bytes    2 bytes
+#         -------------------
+#  ACK   | 04    |   Block #  |
+#         --------------------
 class TftpPacketACK < TftpPacket
     attr_accessor :blocknumber, :buffer
-    #        2 bytes    2 bytes
-    #        -------------------
-    # ACK   | 04    |   Block #  |
-    #        --------------------
+
     def initialize
         super()
         @opcode = 4
@@ -272,24 +336,24 @@ class TftpPacketACK < TftpPacket
     end
 end
 
+#          2 bytes  2 bytes        string    1 byte
+#          ----------------------------------------
+#  ERROR | 05    |  ErrorCode |   ErrMsg   |   0  |
+#          ----------------------------------------
+#      Error Codes
+# 
+#      Value     Meaning
+# 
+#      0         Not defined, see error message (if any).
+#      1         File not found.
+#      2         Access violation.
+#      3         Disk full or allocation exceeded.
+#      4         Illegal TFTP operation.
+#      5         Unknown transfer ID.
+#      6         File already exists.
+#      7         No such user.
+#      8         Failed negotiation
 class TftpPacketERR < TftpPacket
-    #         2 bytes  2 bytes        string    1 byte
-    #         ----------------------------------------
-    # ERROR | 05    |  ErrorCode |   ErrMsg   |   0  |
-    #         ----------------------------------------
-    #     Error Codes
-    # 
-    #     Value     Meaning
-    # 
-    #     0         Not defined, see error message (if any).
-    #     1         File not found.
-    #     2         Access violation.
-    #     3         Disk full or allocation exceeded.
-    #     4         Illegal TFTP operation.
-    #     5         Unknown transfer ID.
-    #     6         File already exists.
-    #     7         No such user.
-    #     8         Failed negotiation
     attr_reader :extended_errmsg
     attr_accessor :errorcode, :errmsg, :buffer
     ErrMsgs = [
@@ -303,6 +367,7 @@ class TftpPacketERR < TftpPacket
         'No such user.',
         'Failed negotiation.'
         ]
+
     def initialize
         super()
         @opcode = 5
@@ -338,15 +403,13 @@ class TftpPacketERR < TftpPacket
 
 end
 
+#  +-------+---~~---+---+---~~---+---+---~~---+---+---~~---+---+
+#  |  opc  |  opt1  | 0 | value1 | 0 |  optN  | 0 | valueN | 0 |
+#  +-------+---~~---+---+---~~---+---+---~~---+---+---~~---+---+
 class TftpPacketOACK < TftpPacket
-    #  +-------+---~~---+---+---~~---+---+---~~---+---+---~~---+---+
-    #  |  opc  |  opt1  | 0 | value1 | 0 |  optN  | 0 | valueN | 0 |
-    #  +-------+---~~---+---+---~~---+---+---~~---+---+---~~---+---+
-    attr_accessor :options
     def initialize
         super()
         @opcode = 6
-        @options = {}
     end
 
     def encode
@@ -355,8 +418,8 @@ class TftpPacketOACK < TftpPacket
         options.each do |key, val|
             format += "a#{key.to_s.length}x"
             format += "a#{val.to_s.length}x"
-            datalist.push key.to_s
-            datalist.push val.to_s
+            datalist.push key
+            datalist.push val
         end
         @buffer = datalist.pack(format)
         return self
@@ -368,7 +431,7 @@ class TftpPacketOACK < TftpPacket
             raise ArgumentError, "opcode #{opcode} is not an OACK"
         end
 
-        @options = decode_with_options(@buffer[2..-1])
+        @options = decode_options(@buffer[2..-1])
         return self
     end
 end
@@ -378,26 +441,15 @@ class TftpPacketFactory
     end
 
     def create(opcode)
-        classname = nil
-        packet = nil
-        case opcode
-        when 1
-            classname = 'TftpPacketRRQ'
-        when 2
-            classname = 'TftpPacketWRQ'
-        when 3
-            classname = 'TftpPacketDAT'
-        when 4
-            classname = 'TftpPacketACK'
-        when 5
-            classname = 'TftpPacketERR'
-        when 6
-            classname = 'TftpPacketOACK'
-        else
-            raise ArgumentError, "Unsupported opcode: #{opcode}"
-        end
-        eval "packet = #{classname}.new"
-        return packet
+        return case opcode
+            when 1 then TftpPacketRRQ
+            when 2 then TftpPacketWRQ
+            when 3 then TftpPacketDAT
+            when 4 then TftpPacketACK
+            when 5 then TftpPacketERR
+            when 6 then TftpPacketOACK
+            else raise ArgumentError, "Unsupported opcode: #{opcode}"
+        end.new
     end
 
     def parse(buffer)
@@ -415,6 +467,7 @@ end
 class TftpSession
     attr_accessor :options, :state
     attr_reader :dups, :errors
+
     def initialize
         # Agreed upon session options
         @options = {}
@@ -454,13 +507,12 @@ class TftpServer < TftpSession
         sock.setsockopt(Socket::SOL_SOCKET, Socket::SO_REUSEADDR, true)
         #sock.setsockopt(Socket::SOL_SOCKET, Socket::SO_RCVTIMEO, SockTimeout)
         sock.bind(iface, port)
-        puts "Bound to #{iface} on port #{port}"
+        $tftplog.info('tftp+') { "Bound to #{iface} on port #{port}" }
 
         factory = TftpPacketFactory.new
         retry_count = 0
         loop do
-            # FIXME - timeout
-            puts "Waiting for incoming datagram..."
+            $tftplog.debug('tftp+') { "Waiting for incoming datagram..." }
             msg = sender = nil
             begin
                 status = Timeout::timeout(SockTimeout) {
@@ -469,16 +521,18 @@ class TftpServer < TftpSession
             rescue Timeout::Error => details
                 retry_count += 1
                 if retry_count > MaxRetry
-                    raise TftpError, "Timeout! Max retries exceeded. Giving up."
+                    msg = "Timeout! Max retries exceeded. Giving up."
+                    $tftplog.error('tftp+') { msg }
+                    raise TftpError, msg
                 else
-                    puts "Timeout! Lets try again."
+                    $tftplog.warn('tftp+') { "Timeout! Lets try again." }
                     next
                 end
             end
             prot, rport, rhost, rip = sender
 
             pkt = factory.parse(msg)
-            puts "pkt is #{pkt}"
+            $tftplog.debug('tftp+') { "pkt is #{pkt}" }
 
             key = "#{rip}-#{rport}"
             handler = nil
@@ -507,29 +561,39 @@ end
 
 class TftpClient < TftpSession
     attr_reader :host, :port
+
     def initialize(host, port)
         super()
         @host = host
         # Force the port to a string type.
-        @port = port.to_s
-        # FIXME - move host and part args to download method
+        @iport = port.to_s
+        @port = nil
+        # FIXME - move host and port args to download method
+
+        begin
+            @address = Resolv::IPv4.create(@host)
+        rescue ArgumentError => details
+            # So, @host doesn't look like an IP. Resolve it.
+            # A Resolv::ResolvError exception could be raised here, let it
+            # filter up.
+            @address = Resolv::DNS.new.getaddress(@host)
+        end
     end
 
     # FIXME - this method is too big
     def download(filename, output, options={})
         @blksize = options[:blksize] if options.has_key? :blksize
-        puts "Opening output file #{output}"
+        $tftplog.debug('tftp+') { "Opening output file #{output}" }
         fout = File.open(output, "w")
         sock = UDPSocket.new
-        #sock.setsockopt(Socket::SOL_SOCKET, Socket::SO_RCVTIMEO, SockTimeout)
        
         pkt = TftpPacketRRQ.new
         pkt.filename = filename
         pkt.mode = 'octet' # FIXME - shouldn't hardcode this
         pkt.options = options
-        puts "Sending download request for #{filename}"
-        puts "host = #{@host}, port = #{@port}"
-        sock.send(pkt.encode.buffer, 0, @host, @port)
+        $tftplog.info('tftp+') { "Sending download request for #{filename}" }
+        $tftplog.info('tftp+') { "host = #{@host}, port = #{@iport}" }
+        sock.send(pkt.encode.buffer, 0, @host, @iport)
         @state = :rrq
 
         factory = TftpPacketFactory.new
@@ -537,8 +601,7 @@ class TftpClient < TftpSession
         blocknumber = 1
         retry_count = 0
         loop do
-            # FIXME - we need to timeout here!
-            puts "Waiting for incoming datagram..."
+            $tftplog.debug('tftp+') { "Waiting for incoming datagram..." }
             msg = sender = nil
             begin
                 status = Timeout::timeout(SockTimeout) {
@@ -547,53 +610,61 @@ class TftpClient < TftpSession
             rescue Timeout::Error => details
                 retry_count += 1
                 if retry_count > MaxRetry
-                    raise TftpError, "Timeout! Max retries exceeded. Giving up."
+                    msg = "Timeout! Max retries exceeded. Giving up."
+                    $tftplog.error('tftp+') { msg }
+                    raise TftpError, msg
                 else
-                    puts "Timeout! Lets try again."
+                    $tftplog.debug('tftp+') { "Timeout! Lets try again." }
                     next
                 end
             end
             prot, rport, rhost, rip = sender
-            puts "Got one, #{msg.length} bytes in size"
-            puts "Remote port is #{rport} and remote host is #{rhost}"
+            $tftplog.info('tftp+') { "Received #{msg.length} byte packet" }
+            $tftplog.debug('tftp+') { "Remote port is #{rport} and remote host is #{rhost}" }
 
-            if @port != rport.to_s or @host != rhost.to_s
-                # Skip it, but inform the sender.
-                err = TftpPacketERR.new
-                err.errorcode = 5 # unknown transfer id
-                sock.send(err.encode.buffer, 0, rhost, rport)
+            if @address.to_s != rip
+                # Skip it
                 @errors += 1
-                $stderr.write "Received rogue packet! #{sender[1]} #{sender[2]}\n"
+                $stderr.write "It is a rogue packet! #{sender[1]} #{sender[2]}\n"
                 next
+            elsif @port and @port != rport.to_s
+                # Skip it
+                @errors += 1
+                $stderr.write "It is a rogue packet! #{sender[1]} #{sender[2]}\n"
+                next
+            else not @port
+                # Set this as our TID
+                $tftplog.info('tftp+') { "Set remote TID to #{@port}" }
+                @port = rport.to_s
             end
 
             pkt = factory.parse(msg)
-            puts "pkt is #{pkt}"
+            $tftplog.debug('tftp+') { "pkt is #{pkt}" }
 
             # FIXME - Refactor this into separate methods to handle each case.
             if pkt.is_a? TftpPacketRRQ
-                # Skip it, but inform the sender.
+                # Skip it, but info('tftp+')rm the sender.
                 err = TftpPacketERR.new
                 err.errorcode = 4 # illegal op
                 sock.send(err.encode.buffer, 0, @host, @port)
                 @errors += 1
-                $stderr.write "Received RRQ packet in download, state #{@state}\n"
+                $stderr.write "It is a RRQ packet in download, state #{@state}\n"
 
             elsif pkt.is_a? TftpPacketWRQ
-                # Skip it, but inform the sender.
+                # Skip it, but info('tftp+')rm the sender.
                 err = TftpPacketERR.new
                 err.errorcode = 4 # illegal op
                 sock.send(err.encode.buffer, 0, @host, @port)
                 @errors += 1
-                $stderr.write "Received WRQ packet in download, state #{@state}\n"
+                $stderr.write "It is a WRQ packet in download, state #{@state}\n"
 
             elsif pkt.is_a? TftpPacketACK
-                # Skip it, but inform the sender.
+                # Skip it, but info('tftp+')rm the sender.
                 err = TftpPacketERR.new
                 err.errorcode = 4 # illegal op
                 sock.send(err.encode.buffer, 0, @host, @port)
                 @errors += 1
-                $stderr.write "Received ACK packet in download, state #{@state}\n"
+                $stderr.write "It is a ACK packet in download, state #{@state}\n"
 
             elsif pkt.is_a? TftpPacketERR
                 @errors += 1
@@ -602,12 +673,13 @@ class TftpClient < TftpSession
             elsif pkt.is_a? TftpPacketOACK
                 unless @state == :rrq
                     @errors += 1
-                    $stderr.write "Received OACK in state #{@state}"
+                    $stderr.write "It is a OACK in state #{@state}"
                     next
                 end
 
                 @state = :oack
                 # Are the acknowledged options the same as ours?
+                # FIXME - factor this into the OACK class?
                 if pkt.options
                     pkt.options do |optname, optval|
                         case optname
@@ -618,7 +690,7 @@ class TftpClient < TftpSession
                                 err = TftpPacketERR.new
                                 err.errorcode = 8 # failed negotiation
                                 sock.send(err.encode.buffer, 0, @host, @port)
-                                raise TftpError, "Received OACK with blocksize when we didn't ask for one."
+                                raise TftpError, "It is a OACK with blocksize when we didn't ask for one."
                             end
 
                             if optval <= options[:blksize] and optval >= MinBlkSize
@@ -626,6 +698,7 @@ class TftpClient < TftpSession
                                 options[:blksize] = optval
                             end
                         else
+                            # FIXME - refactor err packet handling from above...
                             # Nothing that we don't know of should be in the
                             # oack packet.
                             err = TftpPacketERR.new
@@ -654,7 +727,7 @@ class TftpClient < TftpSession
                 # to send an ACK to the server, with block number 0.
                 ack = TftpPacketACK.new
                 ack.blocknumber = 0
-                puts "Sending ACK to OACK"
+                $tftplog.info('tftp+') { "Sending ACK to OACK" }
                 sock.send(ack.encode.buffer, 0, @host, @port)
                 @state = :ack
 
@@ -668,29 +741,29 @@ class TftpClient < TftpSession
                 end
 
                 @state = :dat
-                puts "Received a DAT packet, block #{pkt.blocknumber}"
-                puts "DAT size is #{pkt.data.length}"
+                $tftplog.info('tftp+') { "It is a DAT packet, block #{pkt.blocknumber}" }
+                $tftplog.debug('tftp+') { "DAT size is #{pkt.data.length}" }
 
                 ack = TftpPacketACK.new
                 ack.blocknumber = pkt.blocknumber
 
-                puts "Sending ACK to block #{ack.blocknumber}"
+                $tftplog.info('tftp+') { "Sending ACK to block #{ack.blocknumber}" }
                 sock.send(ack.encode.buffer, 0, @host, @port)
 
                 # Check for dups
                 if pkt.blocknumber <= blocknumber
-                    puts "Received a DUP for block #{blocknumber}"
+                    $tftplog.warn('tftp+') { "It is a DUP for block #{blocknumber}" }
                     @dups += 1
                 elsif pkt.blocknumber = blocknumber+1
-                    puts "Received properly ordered DAT packet"
+                    $tftplog.debug('tftp+') { "It is a properly ordered DAT packet" }
                     blocknumber += 1
                 else
-                    # Skip it, but inform the sender.
+                    # Skip it, but info('tftp+')rm the sender.
                     err = TftpPacketERR.new
                     err.errorcode = 4 # illegal op
                     sock.send(err.encode.buffer, 0, @host, @port)
                     @errors += 1
-                    $stderr.write "Received future packet!\n"
+                    $stderr.write "It is a future packet!\n"
                 end
 
                 # Call any block passed.
@@ -701,15 +774,17 @@ class TftpClient < TftpSession
                 # Write the data to the file.
                 fout.print pkt.data
                 # If the size is less than our blocksize, we're done.
-                puts "pkt.data.length is #{pkt.data.length}"
+                $tftplog.debug('tftp+') { "pkt.data.length is #{pkt.data.length}" }
                 if pkt.data.length < @blksize
-                    puts "Received last packet."
+                    $tftplog.info('tftp+') { "It is a last packet." }
                     fout.close
                     @state = :done
                     break
                 end
             else
-                raise TftpError, "Received unknown packet: #{pkt}"
+                msg = "It is an unknown packet: #{pkt}"
+                $tftplog.error('tftp+') { msg }
+                raise TftpError, msg
             end
         end
     end

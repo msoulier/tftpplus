@@ -1,0 +1,43 @@
+2006-10-10 msoulier
+	* Added site, and Rakefile entry to push site.
+
+2006-10-10 01:46  msoulier
+
+	* trunk/ChangeLog, trunk/README, trunk/doc,
+	  trunk/lib/net/tftp+.rb: Adding Rakefile
+
+2006-10-06 01:35  msoulier
+
+	* trunk/lib/net/tftp+.rb: Optimizing Tftp object dispatch
+
+2006-10-04 01:27  msoulier
+
+	* trunk/lib/net/tftp+.rb: minor method rename
+
+2006-09-25 02:11  msoulier
+
+	* trunk/lib/net/tftp+.rb: Added timeouts on recvfrom
+
+2006-09-24 02:39  msoulier
+
+	* trunk/lib/net/tftp+.rb: Updated debugging output
+
+2006-09-24 02:31  msoulier
+
+	* trunk/lib/net/tftp+.rb, trunk/share, trunk/share/tftp_client.rb,
+	  trunk/test/test.rb: Moved client code into its own sample client.
+
+2006-09-22 16:48  msoulier
+
+	* trunk/lib/net/tftp+.rb: Pulling hardcoded test
+
+2006-09-22 16:44  msoulier
+
+	* doc, lib, test, trunk/doc, trunk/lib, trunk/test: Setting up
+	  branch structure.
+
+2006-09-22 16:42  msoulier
+
+	* doc, doc/rfc1350.txt, doc/rfc2347.txt, doc/rfc2348.txt, lib,
+	  lib/net, lib/net/tftp+.rb, test, test/test.rb: Initial import.
+

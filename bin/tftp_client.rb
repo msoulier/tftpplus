@@ -4,13 +4,20 @@ $:.unshift File.join(File.dirname(__FILE__), "..", "lib")
 require 'net/tftp+'
 require 'optparse'
 require 'ostruct'
+require 'logger'
+
+LogLevel = Logger::INFO
+
+$tftplog = Logger.new($stderr)
+$tftplog.level = LogLevel
+$log = $tftplog
 
 def parse_args
     # Set up defaults
     options = OpenStruct.new
     options.filename = nil
     options.host = nil
-    options.verbose = false
+    options.debug = false
     options.blksize = 512
     options.port = 69
 
@@ -19,23 +26,30 @@ Usage: tftp_client <options>
 EOF
     opts = nil
     begin
+        $log.debug("client") { "Parsing command line arguments" }
         opts = OptionParser.new do |opts|
             opts.banner = banner
 
             opts.on('-f', '--filename=MANDATORY', 'Remote filename') do |f|
                 options.filename = f
+                $log.debug('client') { "filename is #{f}" }
             end
             opts.on('-h', '--host=MANDATORY', 'Remote host or IP address') do |h|
                 options.host = h
+                $log.debug('client') { "host is #{h}" }
             end
             opts.on('-p', '--port=', 'Remote port to use (default: 69)') do |p|
                 options.port = p.to_i
+                $log.debug('client') { "port is #{p}" }
             end
-            opts.on('-v', '--verbose', 'Verbose debugging output') do |d|
-                options.verbose = d
+            opts.on('-d', '--debug', 'Debugging output on') do |d|
+                options.debug = d
+                $log.level = Logger::DEBUG
+                $log.debug('client') { "Debug output requested" }
             end
             opts.on('-b', '--blksize=', 'Blocksize option: 8-65536 bytes') do |b|
                 options.blksize = b.to_i
+                $log.debug('client') { "blksize is #{b}" }
             end
             opts.on_tail('-h', '--help', 'Show this message') do
                 puts opts
@@ -73,26 +87,26 @@ def main
 
     size = 0
     start = Time.now
-    puts "Starting download of #{options.filename} from #{options.host}"
-    puts "Options: blksize = #{options.blksize}"
+    $log.info('client') { "Starting download of #{options.filename} from #{options.host}" }
+    $log.info('client') { "Options: blksize = #{options.blksize}" }
 
     client = TftpClient.new(options.host, options.port)
     tftp_opts = { :blksize => options.blksize.to_i }
     client.download(options.filename, options.filename, tftp_opts) do |pkt|
         size += pkt.data.length
-        puts "Downloaded #{size} bytes" if options.verbose
+        $log.debug('client') { "Downloaded #{size} bytes" }
     end
 
     finish = Time.now
     duration = finish - start
 
-    puts ""
-    puts "Started: #{start}"
-    puts "Finished: #{finish}"
-    puts "Duration: #{duration}"
-    puts "Downloaded #{size} bytes in #{duration} seconds"
-    puts "Throughput: #{(size/duration)*8} bps"
-    puts "            #{(size/duration)*8 / 1024} kbps"
+    $log.info('client') { "" }
+    $log.info('client') { "Started: #{start}" }
+    $log.info('client') { "Finished: #{finish}" }
+    $log.info('client') { "Duration: #{duration}" }
+    $log.info('client') { "Downloaded #{size} bytes in #{duration} seconds" }
+    $log.info('client') { "Throughput: #{(size/duration)*8} bps" }
+    $log.info('client') { "            #{(size/duration)*8 / 1024} kbps" }
 end
 
 main

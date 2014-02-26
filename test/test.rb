@@ -12,6 +12,9 @@ class TestTftp < Test::Unit::TestCase
         rrq.encode
         assert_equal("\000\001myfilename\000octet\000", rrq.buffer)
         assert_equal(1, rrq.opcode)
+        rrq.decode
+        assert_equal('myfilename', rrq.filename)
+        assert_equal('octet', rrq.mode)
 
         wrq = TftpPacketWRQ.new
         wrq.buffer = "\000\002myfilename\000octet\000"
@@ -19,12 +22,16 @@ class TestTftp < Test::Unit::TestCase
         assert_equal('myfilename', wrq.filename)
         assert_equal('octet', wrq.mode)
         assert_equal(2, wrq.opcode)
+        wrq.encode.decode
+        assert_equal('myfilename', wrq.filename)
+        assert_equal('octet', wrq.mode)
+        assert_equal(2, wrq.opcode)
 
         dat = TftpPacketDAT.new
         sampledat = "\000\001\002\003\004\005"
         dat.data = sampledat
-        dat.encode
-        assert_equal(sampledat, dat.decode.data)
+        dat.encode.decode
+        assert_equal(sampledat, dat.data)
         assert_equal(6, dat.data.length)
         assert_equal(3, dat.opcode)
 
@@ -45,7 +52,7 @@ class TestTftp < Test::Unit::TestCase
         }
         oack.options = oack_options
         oack.encode.decode
-        assert_equal(4096, oack.options[:blksize])
+        assert_equal('4096', oack.options[:blksize])
         assert_equal(6, oack.opcode)
     end
 end
