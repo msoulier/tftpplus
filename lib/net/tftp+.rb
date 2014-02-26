@@ -953,7 +953,7 @@ class TftpServerHandler < TftpSession
         path = @root + '/' + @filename
         if File.exists?(path)
             debug "Opening file #{path} for reading"
-            @file = File.new(path, "r")
+            @file = File.new(path, "rb")
             debug "File open: #{@file.inspect}"
             send_dat()
         else
@@ -978,10 +978,10 @@ class TftpServerHandler < TftpSession
         unless opts.key?(:resend) and opts[:resend]
             blksize = @options[:blksize].to_i
             debug "Reading #{blksize} bytes from file #{@filename}"
-            rv = @file.read(blksize, @buffer)
+            @buffer = @file.read(blksize)
             debug "@buffer is now #{@buffer.class}"
             debug "Read #{@buffer.length} bytes into buffer"
-            unless rv
+            if @file.eof
                 info "End of file #{@filename} detected."
                 @file.close
                 @state = :fin

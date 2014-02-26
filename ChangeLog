@@ -1,3 +1,31 @@
+2007-05-31 01:45  msoulier
+
+	* lib/net/tftp+.rb: Fixed download problem on windows
+
+2007-04-29 13:24  msoulier
+
+	* bin/tftp_client.rb: Fixed client error not going to the logger
+
+2007-03-31 01:17  msoulier
+
+	* Rakefile: Updated the gemspec.
+
+2007-03-31 00:53  msoulier
+
+	* Rakefile: Updated description.
+
+2007-03-20 01:39  msoulier
+
+	* Rakefile: Rolling version ahead.
+
+2007-03-20 01:27  msoulier
+
+	* ChangeLog: Updated ChangeLog for version 0.3.
+
+2007-03-20 01:26  msoulier
+
+	* README: Updated README.
+
 2007-03-15 00:00  msoulier
 
 	* ChangeLog: Updated ChangeLog

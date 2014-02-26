@@ -3,7 +3,7 @@ require 'rake/rdoctask'
 require 'rake/clean'
 require 'rake/gempackagetask'
 
-Version = '0.3'
+Version = '0.4'
 
 task "default" => ["test"]
 
@@ -34,11 +34,8 @@ CLEAN.include('pkg', 'html')
 
 spec = Gem::Specification.new do |spec|
     spec.name = 'tftpplus'
-    spec.summary = 'A pure tftp implementation with support for variable block sizes'
-    spec.description = %{A new tftp library for clients and servers that
-    supports RFCs 1350, 2347 and 2348 (ie. variable block sizes). It includes
-    a sample client implementation, and will eventually include a
-    multi-threaded server as well.}
+    spec.summary = 'A pure Ruby TFTP implementation with support for variable block sizes (RFCs 1350, 2347 and 2348).'
+    spec.description = %{A new tftp library for clients and servers that supports RFCs 1350, 2347 and 2348 (ie. variable block sizes). It includes a sample client implementation, and a sample server implementation. The server is single-threaded and supports multiple simultaneous downloads.}
     spec.author = 'Michael P. Soulier'
     spec.email = 'msoulier@digitaltorque.ca'
     spec.homepage = 'http://tftpplus.rubyforge.org'
@@ -46,6 +43,9 @@ spec = Gem::Specification.new do |spec|
     spec.executables = ['tftp_client.rb']
     spec.files = FileList['lib/**/*.rb', 'README', 'ChangeLog'] + spec.test_files
     spec.version = Version
+    spec.has_rdoc = true
+    spec.extra_rdoc_files = ['README']
+    spec.platform = Gem::Platform::RUBY
 end
 
 Rake::GemPackageTask.new(spec) do |pkg|

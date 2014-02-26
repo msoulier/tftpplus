@@ -7,18 +7,20 @@ A new tftp library for clients and servers that supports RFCs 1350, 2347 and
 Release Notes:
 ==============
 
+About version 0.4:
+------------------
+- Fixed a download problem on windows.
+
 About version 0.3:
 ------------------
 - First working server class.
 
 About version 0.2:
 ------------------
-
 - Fixed handling of remote TID.
 
 About version 0.1:
 ------------------
-
 - Added timeouts on recvfrom
 - Updated debugging output
 - Moved client code into its own sample client.

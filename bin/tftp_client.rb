@@ -104,8 +104,8 @@ def main
             $log.debug('client') { "Downloaded #{size} bytes" }
         end
     rescue TftpError => details
-        $stderr.puts "Fatal exception in transfer"
-        $stderr.puts details
+        $log.error "Fatal exception in transfer"
+        $log.error details
     end
 
     finish = Time.now
